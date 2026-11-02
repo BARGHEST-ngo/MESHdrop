@@ -68,5 +68,5 @@ func (s *SendService) StopSend() error {
 }
 
 func (s *SendService) ServiceShutdown() error {
-	return nil
+	return s.StopSend()
 }

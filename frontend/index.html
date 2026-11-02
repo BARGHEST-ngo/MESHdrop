@@ -7,17 +7,23 @@
     <title>meshdrop</title>
     <style>
         /* Placeholder layout for the first working version; the real design comes later. */
-        .state[hidden] { display: none; }
-        .state { display: flex; flex-direction: column; gap: 14px; align-items: flex-start; }
+        .screen[hidden] { display: none; }
+        .screen { display: flex; flex-direction: column; gap: 14px; align-items: flex-start; width: 100%; max-width: 560px; }
         .field-label { font-size: 13px; opacity: 0.7; }
         .address {
-            width: 100%; max-width: 560px; font-family: monospace; font-size: 12px;
+            width: 100%; font-family: monospace; font-size: 12px;
             word-break: break-all; padding: 10px; border-radius: 10px;
             background: rgba(255, 255, 255, 0.06);
         }
+        textarea.address { color: inherit; border: 1px solid rgba(255, 255, 255, 0.12); resize: none; height: 5.5em; }
         .pin { font-size: 44px; letter-spacing: 0.25em; font-variant-numeric: tabular-nums; }
+        input.pin {
+            width: 7.5em; font-size: 28px; padding: 6px 10px; border-radius: 10px; color: inherit;
+            background: rgba(255, 255, 255, 0.06); border: 1px solid rgba(255, 255, 255, 0.12);
+        }
         .row { display: flex; gap: 10px; }
         .btn-quiet { background: rgba(255, 255, 255, 0.08); box-shadow: none; }
+        .btn:disabled { opacity: 0.5; cursor: default; }
         .error { color: #ff6b6b; min-height: 1.2em; }
     </style>
 </head>
@@ -27,28 +33,55 @@
 <main class="container">
     <h1 class="title"><span class="title-accent">mesh</span>drop</h1>
 
-    <!-- Idle: nothing running -->
-    <section class="state" id="state-idle">
+    <!-- Home: choose a direction -->
+    <section class="screen" id="screen-home">
         <p class="subtitle">Send files straight to another computer.</p>
-        <button class="btn" id="send">Send</button>
+        <div class="row">
+            <button class="btn" id="send">Send</button>
+            <button class="btn" id="receive">Receive</button>
+        </div>
     </section>
 
-    <!-- Waiting: server running, pairing open -->
-    <section class="state" id="state-waiting" hidden>
+    <!-- Send: server running, pairing open -->
+    <section class="screen" id="screen-send-waiting" hidden>
         <span class="field-label">Send this link to the receiver</span>
         <div class="address" id="address"></div>
         <span class="field-label">Then give them this PIN separately</span>
         <div class="pin" id="pin"></div>
         <div class="row">
             <button class="btn" id="copy">Copy link</button>
-            <button class="btn btn-quiet" id="cancel-waiting">Cancel</button>
+            <button class="btn btn-quiet" id="send-cancel">Cancel</button>
         </div>
     </section>
 
-    <!-- Connected: receiver paired -->
-    <section class="state" id="state-connected" hidden>
+    <!-- Send: receiver paired -->
+    <section class="screen" id="screen-send-connected" hidden>
         <p class="subtitle">Connected to <strong id="peer-name"></strong></p>
-        <button class="btn btn-quiet" id="cancel-connected">Disconnect</button>
+        <button class="btn btn-quiet" id="send-disconnect">Disconnect</button>
+    </section>
+
+    <!-- Receive: enter link and PIN -->
+    <form class="screen" id="screen-receive-form" hidden>
+        <label class="field-label" for="receive-address">Paste the link from the sender</label>
+        <textarea class="address" id="receive-address" spellcheck="false" autocomplete="off"></textarea>
+        <label class="field-label" for="receive-pin">PIN</label>
+        <input class="pin" id="receive-pin" inputmode="numeric" maxlength="6" autocomplete="off"/>
+        <div class="row">
+            <button class="btn" id="receive-connect" type="submit" disabled>Connect</button>
+            <button class="btn btn-quiet" id="receive-back" type="button">Back</button>
+        </div>
+    </form>
+
+    <!-- Receive: Connect in progress -->
+    <section class="screen" id="screen-receive-connecting" hidden>
+        <p class="subtitle">Connecting…</p>
+        <button class="btn btn-quiet" id="receive-cancel">Cancel</button>
+    </section>
+
+    <!-- Receive: paired with sender -->
+    <section class="screen" id="screen-receive-connected" hidden>
+        <p class="subtitle">Connected to the sender</p>
+        <button class="btn btn-quiet" id="receive-disconnect">Disconnect</button>
     </section>
 
     <p class="error" id="error" role="status" aria-live="polite"></p>

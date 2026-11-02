@@ -9,6 +9,11 @@ import type {} from "../github.com/wailsapp/wails/v3/internal/eventdata.js";
 import "../github.com/wailsapp/wails/v3/internal/eventcreate.js";
 
 /**
+ * Name of the custom event "receive:disconnected".
+ */
+export const ReceiveDisconnected = "receive:disconnected";
+
+/**
  * Name of the custom event "send:connected".
  */
 export const SendConnected = "send:connected";

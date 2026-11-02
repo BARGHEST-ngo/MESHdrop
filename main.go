@@ -19,6 +19,7 @@ var assets embed.FS
 func init() {
 	application.RegisterEvent[string]("send:connected")
 	application.RegisterEvent[string]("send:disconnected")
+	application.RegisterEvent[string]("receive:disconnected")
 }
 
 // main function serves as the application's entry point. It initializes the application, creates a window,
@@ -36,6 +37,7 @@ func main() {
 		Description: "A demo of using raw HTML & CSS",
 		Services: []application.Service{
 			application.NewService(&SendService{}),
+			application.NewService(&ReceiveService{}),
 		},
 		Assets: application.AssetOptions{
 			Handler: application.AssetFileServerFS(assets),
@@ -51,7 +53,7 @@ func main() {
 	// 'BackgroundColour' is the background colour of the window.
 	// 'URL' is the URL that will be loaded into the webview.
 	app.Window.NewWithOptions(application.WebviewWindowOptions{
-		Title: "Window 1",
+		Title: "MESHdrop",
 		// Window sized to the golden ratio (1000 / 618 ≈ 1.618).
 		Width:  1000,
 		Height: 618,
