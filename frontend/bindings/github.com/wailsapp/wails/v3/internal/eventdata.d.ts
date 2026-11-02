@@ -8,7 +8,8 @@ import type { Events } from "@wailsio/runtime";
 declare module "@wailsio/runtime" {
     namespace Events {
         interface CustomEvents {
-            "time": string;
+            "send:connected": string;
+            "send:disconnected": string;
         }
     }
 }

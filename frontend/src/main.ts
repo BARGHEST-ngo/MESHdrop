@@ -1,65 +1,93 @@
-import {Events, WML} from "@wailsio/runtime";
-import {GreetService} from "../bindings/github.com/DWoodhouse22/meshdrop";
+import {Clipboard, Events} from "@wailsio/runtime";
+import {SendService} from "../bindings/github.com/DWoodhouse22/meshdrop";
 
-// Wire up data-wml-openURL links (logos + footer "Docs" link) once the DOM is ready.
-WML.Enable();
+type State = "idle" | "waiting" | "connected";
 
-const greetButton = document.getElementById('greet')! as HTMLButtonElement;
-const nameElement = document.getElementById('name')! as HTMLInputElement;
-const resultElement = document.getElementById('result')! as HTMLSpanElement;
-const timeElement = document.getElementById('time')! as HTMLSpanElement;
-const titleNameElement = document.querySelector('.title-name')! as HTMLElement;
-const toastElement = document.getElementById('toast')! as HTMLDivElement;
-let toastTimer: ReturnType<typeof setTimeout>;
+const el = <T extends HTMLElement>(id: string) => document.getElementById(id)! as T;
 
-// Show the actual Wails version this project was generated against.
-document.getElementById('version')!.innerText = "v3.0.0";
+const states: Record<State, HTMLElement> = {
+    idle: el("state-idle"),
+    waiting: el("state-waiting"),
+    connected: el("state-connected"),
+};
+const addressEl = el("address");
+const pinEl = el("pin");
+const peerNameEl = el("peer-name");
+const errorEl = el("error");
+const sendBtn = el<HTMLButtonElement>("send");
+const copyBtn = el<HTMLButtonElement>("copy");
 
-// Crossfade the framework word in the heading ("Wails + JavaScript") to the name
-// the user entered ("Wails + <name>"): the old word fades out while the new one
-// fades in over the same spot.
-function swapTitleName(name: string) {
-    const current = titleNameElement.querySelector('.title-name-text:not(.is-outgoing)') as HTMLElement | null;
-    if (!current || current.textContent === name) {
-        return;
+let address = "";
+
+function show(state: State) {
+    for (const [name, section] of Object.entries(states)) {
+        section.hidden = name !== state;
     }
-    const incoming = document.createElement('span');
-    incoming.className = 'title-name-text is-entering';
-    incoming.textContent = name;
-    current.classList.add('is-outgoing');
-    titleNameElement.appendChild(incoming);
-    // Force a reflow so the transitions run from the starting state.
-    void incoming.offsetWidth;
-    incoming.classList.remove('is-entering');
-    current.classList.add('is-leaving');
-    current.addEventListener('transitionend', () => current.remove(), {once: true});
 }
 
-// Pop the toast with the message Go returned, then auto-dismiss it.
-function showToast(message: string) {
-    resultElement.innerText = message;
-    toastElement.classList.add('is-visible');
-    clearTimeout(toastTimer);
-    toastTimer = setTimeout(() => toastElement.classList.remove('is-visible'), 4000);
+function showError(err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    errorEl.textContent = msg;
+    console.error(err);
 }
 
-greetButton.addEventListener('click', async () => {
-    let name = nameElement.value;
-    if (!name) {
-        name = 'anonymous';
-    }
-    swapTitleName(name);
+function clearError() {
+    errorEl.textContent = "";
+}
+
+async function stop() {
     try {
-        showToast(await GreetService.Greet(name));
+        await SendService.StopSend();
     } catch (err) {
-        console.error(err);
+        showError(err);
+    }
+    address = "";
+    show("idle");
+}
+
+sendBtn.addEventListener("click", async () => {
+    clearError();
+    sendBtn.disabled = true;
+    sendBtn.textContent = "Starting…"; // Start can take a few seconds
+    try {
+        const info = await SendService.StartSend();
+        address = info.address;
+        addressEl.textContent = info.address;
+        pinEl.textContent = info.pin;
+        show("waiting");
+    } catch (err) {
+        showError(err);
+    } finally {
+        sendBtn.disabled = false;
+        sendBtn.textContent = "Send";
     }
 });
 
-Events.On('time', (time) => {
-    // The full RFC1123 stamp is too wide for the footer on a phone, so on narrow
-    // screens (matching the CSS breakpoint) we show just the clock time.
-    const full = time.data;
-    const compact = (full.match(/\d{1,2}:\d{2}:\d{2}/) || [full])[0];
-    timeElement.innerText = window.matchMedia('(max-width: 640px)').matches ? compact : full;
+copyBtn.addEventListener("click", async () => {
+    try {
+        await Clipboard.SetText(address);
+        copyBtn.textContent = "Copied";
+        setTimeout(() => (copyBtn.textContent = "Copy link"), 1500);
+    } catch (err) {
+        showError(err);
+    }
 });
+
+el("cancel-waiting").addEventListener("click", stop);
+el("cancel-connected").addEventListener("click", stop);
+
+Events.On("send:connected", (ev) => {
+    clearError();
+    peerNameEl.textContent = ev.data || "unnamed device";
+    show("connected");
+});
+
+// A finished session can't be reused, so stop the server and go back to idle.
+Events.On("send:disconnected", async (ev) => {
+    if (ev.data) {
+        errorEl.textContent = `Disconnected: ${ev.data}`;
+    }
+    await stop();
+});
+
+show("idle");

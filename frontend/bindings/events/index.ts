@@ -9,7 +9,12 @@ import type {} from "../github.com/wailsapp/wails/v3/internal/eventdata.js";
 import "../github.com/wailsapp/wails/v3/internal/eventcreate.js";
 
 /**
- * Name of the custom event "time".
+ * Name of the custom event "send:connected".
  */
-export const Time = "time";
+export const SendConnected = "send:connected";
+
+/**
+ * Name of the custom event "send:disconnected".
+ */
+export const SendDisconnected = "send:disconnected";
 
