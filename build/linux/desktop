@@ -1,0 +1,13 @@
+[Desktop Entry]
+Version=1.0
+Name=My Product
+Comment=A meshdrop application
+# The Exec line includes %u to pass the URL to the application
+Exec=/usr/local/bin/meshdrop %u
+Terminal=false
+Type=Application
+Icon=meshdrop
+Categories=Utility;
+StartupWMClass=meshdrop
+
+ 
