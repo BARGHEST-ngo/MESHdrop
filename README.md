@@ -6,6 +6,20 @@ MESHdrop sends a file straight from one desktop to another, wherever they are. T
 
 > **Status: early alpha.** It works end to end, but it hasn't been widely tested.
 
+## Installing
+
+Download the build for your system from [Releases](https://github.com/BARGHEST-ngo/meshdrop/releases).
+
+**Linux** needs WebKitGTK 6 installed. Many desktops already have it. If MESHdrop fails to start with `libwebkitgtk-6.0.so.4: cannot open shared object file`, install it:
+
+| Distro | Command |
+| --- | --- |
+| Ubuntu 24.04+ / Debian 13+ | `sudo apt install libwebkitgtk-6.0-4` |
+| Fedora | `sudo dnf install webkitgtk6.0` |
+| Arch | `sudo pacman -S webkitgtk-6.0` |
+
+Older distros, such as Ubuntu 22.04, don't have WebKitGTK 6 and can't run MESHdrop yet.
+
 ## How it works
 
 **Sending**
