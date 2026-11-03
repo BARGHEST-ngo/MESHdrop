@@ -4,7 +4,7 @@ Private file transfer between two computers. No cloud, no account, no trace. Bui
 
 MESHdrop sends a file straight from one desktop to another, wherever they are. There's nothing to sign up for and no upload to a third-party service. The sender gets a link and a 6-digit PIN, shares them with the receiver, and the file goes across once the receiver accepts it.
 
-> **Status: early alpha.** It works end to end, but it hasn't been widely tested. Don't rely on it for anything important yet.
+> **Status: early alpha.** It works end to end, but it hasn't been widely tested.
 
 ## How it works
 
@@ -20,7 +20,7 @@ MESHdrop sends a file straight from one desktop to another, wherever they are. T
 2. Paste the link, type the PIN, and connect.
 3. MESHdrop shows the file's name and size. Click **Accept** to choose where to save it, or **Decline** to refuse it.
 
-Each link and PIN works for one pairing. To send to someone new, start again from Send.
+Each link and PIN works for a single transfer.
 
 ## Privacy
 
