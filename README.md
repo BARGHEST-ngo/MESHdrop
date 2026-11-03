@@ -20,6 +20,12 @@ Download the build for your system from [Releases](https://github.com/BARGHEST-n
 
 Older distros, such as Ubuntu 22.04, don't have WebKitGTK 6 and can't run MESHdrop yet.
 
+**macOS** will block MESHdrop the first time you open it, because the app isn't signed with an Apple Developer ID yet. To allow it:
+
+1. Unzip the download, move `meshdrop.app` to Applications, and open it. macOS shows a warning and refuses to open the app.
+2. Open **System Settings → Privacy & Security**, scroll down to the message about MESHdrop, and click **Open Anyway**.
+3. Open MESHdrop again and confirm. You only need to do this once.
+
 ## How it works
 
 **Sending**
