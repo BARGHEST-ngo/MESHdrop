@@ -140,7 +140,20 @@ Events.On("send:connected", (ev) => {
 
 Events.On("send:accepted", () => {
     if (!sendActive) return;
-    sendStatus.textContent = "Accepted"; // the transfer itself comes next
+    sendStatus.textContent = "Sending…";
+});
+
+// The receiver confirmed it has every byte, so it's safe to stop now.
+Events.On("send:complete", async () => {
+    if (!sendActive) return;
+    await stopSend();
+    showNotice(`Sent to ${peerName}.`);
+});
+
+Events.On("send:failed", async (ev) => {
+    if (!sendActive) return;
+    await stopSend();
+    showError(`Transfer failed: ${ev.data}`);
 });
 
 Events.On("send:declined", async () => {
@@ -250,24 +263,40 @@ Events.On("receive:offer", (ev) => {
     show("receive-offer");
 });
 
+// STOPGAP: MESHnet v0.1.0-alpha doesn't tell the other side about a deliberate
+// close, and Disconnect drops queued messages. So we can't wait for the sender
+// to hang up (we'd only notice at the liveness timeout), and we can't disconnect
+// straight after Send (the last message would be lost). Give the message a
+// moment to go out, then hang up ourselves. Remove once MESHnet closes gracefully.
+const FLUSH_MS = 500;
+
+// Shows status, waits for our last message to go out, then hangs up and
+// shows notice on the home screen.
+async function hangUpAfterFlush(status: string, notice: string) {
+    receiveActive = false; // our own hang-up isn't an error
+    receiveStatus.textContent = status;
+    show("receive-connected");
+    await new Promise((r) => setTimeout(r, FLUSH_MS));
+    await stopReceive();
+    showNotice(notice);
+}
+
 acceptBtn.addEventListener("click", async () => {
     acceptBtn.disabled = declineBtn.disabled = true;
     try {
-        await ReceiveService.Accept();
-        receiveStatus.textContent = "Accepted. Waiting for the file…";
+        // Opens the save dialog; false means the user cancelled it.
+        const accepted = await ReceiveService.Accept();
+        if (!accepted) {
+            acceptBtn.disabled = declineBtn.disabled = false;
+            return; // stay on the offer screen
+        }
+        receiveStatus.textContent = "Receiving…";
         show("receive-connected");
     } catch (err) {
         showError(err);
         acceptBtn.disabled = declineBtn.disabled = false;
     }
 });
-
-// STOPGAP: MESHnet v0.1.0-alpha doesn't tell the other side about a deliberate
-// close, and Disconnect drops queued messages. So we can't wait for the sender
-// to hang up (we'd only notice at the liveness timeout), and we can't disconnect
-// straight after Send (the decline would be lost). Give the message a moment to
-// go out, then hang up ourselves. Remove once MESHnet closes gracefully.
-const DECLINE_FLUSH_MS = 500;
 
 declineBtn.addEventListener("click", async () => {
     acceptBtn.disabled = declineBtn.disabled = true;
@@ -278,12 +307,20 @@ declineBtn.addEventListener("click", async () => {
         acceptBtn.disabled = declineBtn.disabled = false;
         return;
     }
-    receiveActive = false; // our own hang-up below isn't an error
-    receiveStatus.textContent = "Declined. Closing…";
-    show("receive-connected");
-    await new Promise((r) => setTimeout(r, DECLINE_FLUSH_MS));
+    await hangUpAfterFlush("Declined. Closing…", "You declined the file.");
+});
+
+// Saved and "received" sent to the sender.
+Events.On("receive:complete", async () => {
+    if (!receiveActive) return;
+    await hangUpAfterFlush("Saved. Closing…", "File saved.");
+});
+
+// The .part file has already been deleted on the Go side.
+Events.On("receive:failed", async (ev) => {
+    if (!receiveActive) return; // e.g. we cancelled mid-transfer ourselves
     await stopReceive();
-    showNotice("You declined the file.");
+    showError(`Transfer failed: ${ev.data}`);
 });
 
 Events.On("receive:disconnected", async (ev) => {

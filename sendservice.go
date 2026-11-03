@@ -1,11 +1,14 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"sync"
+	"time"
 
 	meshnet "github.com/BARGHEST-ngo/MESHnet"
 	"github.com/wailsapp/wails/v3/pkg/application"
@@ -28,28 +31,31 @@ type SendService struct {
 }
 
 func (s *SendService) StartSend() (SendInfo, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	if s.path == "" {
 		return SendInfo{}, fmt.Errorf("choose a file first")
 	}
 
-	s.mu.Lock()
-	defer s.mu.Unlock()
 	if s.srv != nil {
 		return SendInfo{}, fmt.Errorf("server already started")
 	}
 
 	path := s.path
 	var srv *meshnet.Server
+	var offered FileInfo
+	var sending bool
 	srv = meshnet.NewServer(meshnet.ServerConfig{
 		OnClientConnected: func(c meshnet.ClientInfo) {
-			application.Get().Event.Emit("send:connected", c.Name)
+			emit("send:connected", c.Name)
 			info, err := os.Stat(path)
 			if err != nil {
 				// log error
 				srv.DisconnectClient(c.ID)
 				return
 			}
-			data, err := json.Marshal(FileInfo{Name: filepath.Base(path), Size: info.Size()})
+			offered = FileInfo{Name: filepath.Base(path), Size: info.Size()}
+			data, err := json.Marshal(offered)
 			if err != nil {
 				// log err
 				srv.DisconnectClient(c.ID)
@@ -62,14 +68,21 @@ func (s *SendService) StartSend() (SendInfo, error) {
 			if e != nil {
 				reason = e.Error()
 			}
-			application.Get().Event.Emit("send:disconnected", reason)
+			emit("send:disconnected", reason)
 		},
 		OnMessage: func(clientID string, m meshnet.Message) {
 			switch m.Topic {
 			case "accept":
-				application.Get().Event.Emit("send:accepted")
+				if sending {
+					return
+				}
+				sending = true
+				emit("send:accepted", nil)
+				go sendFile(srv, clientID, path, offered.Size)
 			case "decline":
-				application.Get().Event.Emit("send:declined")
+				emit("send:declined", nil)
+			case "received":
+				emit("send:complete", nil)
 			}
 		},
 	})
@@ -90,6 +103,37 @@ func (s *SendService) StartSend() (SendInfo, error) {
 		PIN:     pin,
 	}
 	return info, nil
+}
+
+func sendFile(srv *meshnet.Server, clientID, path string, size int64) {
+	fail := func(err error) {
+		emit("send:failed", err.Error())
+		srv.DisconnectClient(clientID)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	stream, err := srv.RequestStream(ctx, clientID, "file")
+	if err != nil {
+		fail(fmt.Errorf("open stream: %w", err))
+		return
+	}
+	defer stream.Close()
+
+	f, err := os.Open(path)
+	if err != nil {
+		fail(err)
+		return
+	}
+	defer f.Close()
+
+	if _, err := io.CopyN(stream, f, size); err != nil {
+		fail(fmt.Errorf("send: %w", err))
+	}
+}
+
+func emit(evt string, payload any) {
+	application.Get().Event.Emit(evt, payload)
 }
 
 func (s *SendService) StopSend() error {

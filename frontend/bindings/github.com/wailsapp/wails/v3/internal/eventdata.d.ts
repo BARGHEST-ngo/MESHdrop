@@ -12,12 +12,16 @@ import type * as main$0 from "../../../../DWoodhouse22/meshdrop/models.js";
 declare module "@wailsio/runtime" {
     namespace Events {
         interface CustomEvents {
+            "receive:complete": void;
             "receive:disconnected": string;
+            "receive:failed": string;
             "receive:offer": main$0.FileInfo;
             "send:accepted": void;
+            "send:complete": void;
             "send:connected": string;
             "send:declined": void;
             "send:disconnected": string;
+            "send:failed": string;
         }
     }
 }

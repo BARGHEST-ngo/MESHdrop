@@ -9,9 +9,19 @@ import type {} from "../github.com/wailsapp/wails/v3/internal/eventdata.js";
 import "../github.com/wailsapp/wails/v3/internal/eventcreate.js";
 
 /**
+ * Name of the custom event "receive:complete".
+ */
+export const ReceiveComplete = "receive:complete";
+
+/**
  * Name of the custom event "receive:disconnected".
  */
 export const ReceiveDisconnected = "receive:disconnected";
+
+/**
+ * Name of the custom event "receive:failed".
+ */
+export const ReceiveFailed = "receive:failed";
 
 /**
  * Name of the custom event "receive:offer".
@@ -22,6 +32,11 @@ export const ReceiveOffer = "receive:offer";
  * Name of the custom event "send:accepted".
  */
 export const SendAccepted = "send:accepted";
+
+/**
+ * Name of the custom event "send:complete".
+ */
+export const SendComplete = "send:complete";
 
 /**
  * Name of the custom event "send:connected".
@@ -37,4 +52,9 @@ export const SendDeclined = "send:declined";
  * Name of the custom event "send:disconnected".
  */
 export const SendDisconnected = "send:disconnected";
+
+/**
+ * Name of the custom event "send:failed".
+ */
+export const SendFailed = "send:failed";
 

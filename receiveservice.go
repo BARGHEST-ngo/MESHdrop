@@ -4,7 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
+	"net"
 	"os"
+	"path/filepath"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -17,6 +20,13 @@ type ReceiveService struct {
 	mu     sync.Mutex
 	client *meshnet.Client
 	cancel context.CancelFunc
+	sess   *receiveSession
+}
+
+type receiveSession struct {
+	mu    sync.Mutex
+	offer *FileInfo
+	dst   string
 }
 
 func (s *ReceiveService) Connect(address, pin string) error {
@@ -28,7 +38,9 @@ func (s *ReceiveService) Connect(address, pin string) error {
 	}
 
 	name, _ := os.Hostname()
-	c := meshnet.NewClient(meshnet.ClientConfig{
+	sess := &receiveSession{}
+	var c *meshnet.Client
+	c = meshnet.NewClient(meshnet.ClientConfig{
 		ServerAddr: address,
 		PairingPIN: pin,
 		Name:       name,
@@ -45,21 +57,49 @@ func (s *ReceiveService) Connect(address, pin string) error {
 				if e != nil {
 					reason = e.Error()
 				}
-				application.Get().Event.Emit("receive:disconnected", reason)
+				emit("receive:disconnected", reason)
 			}
 		},
 		OnMessage: func(m meshnet.Message) {
-			if m.Topic == "offer" {
-				var fileInfo FileInfo
-				if err := json.Unmarshal(m.Data, &fileInfo); err != nil {
-					// log error
-					return
-				}
-				application.Get().Event.Emit("receive:offer", fileInfo)
+			if m.Topic != "offer" {
+				return
 			}
+			var offer FileInfo
+			if err := json.Unmarshal(m.Data, &offer); err != nil || offer.Size < 0 {
+				// log error
+				return
+			}
+			sess.mu.Lock()
+			sess.offer = &offer
+			sess.dst = ""
+			sess.mu.Unlock()
+			emit("receive:offer", offer)
+		},
+		OnStreamRequest: func(target string, stream net.Conn) {
+			defer stream.Close()
+			if target != "file" {
+				return
+			}
+			sess.mu.Lock()
+			offer := sess.offer
+			dst := sess.dst
+			sess.dst = ""
+			sess.mu.Unlock()
+			if offer == nil || dst == "" {
+				return
+			}
+
+			if err := receiveFile(stream, dst, offer.Size); err != nil {
+				emit("receive:failed", err.Error())
+				return
+			}
+
+			c.Send(meshnet.Message{Topic: "received"})
+			emit("receive:complete", nil)
 		},
 	})
 	s.client = c
+	s.sess = sess
 
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
@@ -71,12 +111,46 @@ func (s *ReceiveService) Connect(address, pin string) error {
 		if s.client == c { // still ours? A Cancel + new Connect may have replaced it
 			s.client = nil
 			s.cancel = nil
+			s.sess = nil
 		}
 		s.mu.Unlock()
 		return fmt.Errorf("connect: %w", err)
 	}
 
 	return nil
+}
+
+func receiveFile(r io.Reader, dest string, size int64) (err error) {
+	part := dest + ".part"
+	f, err := os.OpenFile(part, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o600)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if err != nil {
+			os.Remove(part)
+		}
+	}()
+
+	_, err = io.CopyN(f, r, size) // don't wait for EOF (see the close gap)
+	if err == nil {
+		err = f.Sync()
+	}
+	if cerr := f.Close(); err == nil {
+		err = cerr
+	}
+	if err != nil {
+		return err
+	}
+	return os.Rename(part, dest)
+}
+
+func safeName(name string) string {
+	n := filepath.Base(name)
+	if n == "" || n == "." || n == ".." || n == string(filepath.Separator) {
+		return "download"
+	}
+	return n
 }
 
 func (s *ReceiveService) CancelReceive() error {
@@ -86,6 +160,7 @@ func (s *ReceiveService) CancelReceive() error {
 
 	s.client = nil
 	s.cancel = nil
+	s.sess = nil
 	s.mu.Unlock()
 
 	if cancel != nil {
@@ -100,15 +175,33 @@ func (s *ReceiveService) CancelReceive() error {
 	return err
 }
 
-func (s *ReceiveService) Accept() error {
+func (s *ReceiveService) Accept() (bool, error) {
 	s.mu.Lock()
 	c := s.client
+	sess := s.sess
 	s.mu.Unlock()
-	if c == nil {
-		return fmt.Errorf("not connected")
+	if c == nil || sess == nil {
+		return false, fmt.Errorf("not connected")
 	}
 
-	return c.Send(meshnet.Message{Topic: "accept"})
+	sess.mu.Lock()
+	offer := sess.offer
+	sess.mu.Unlock()
+	if offer == nil {
+		return false, fmt.Errorf("no offer")
+	}
+
+	dst, err := application.Get().Dialog.SaveFile().
+		SetFilename(safeName(offer.Name)).
+		PromptForSingleSelection()
+	if err != nil || dst == "" {
+		return false, err
+	}
+
+	sess.mu.Lock()
+	sess.dst = dst
+	sess.mu.Unlock()
+	return true, c.Send(meshnet.Message{Topic: "accept"})
 }
 
 func (s *ReceiveService) Decline() error {
