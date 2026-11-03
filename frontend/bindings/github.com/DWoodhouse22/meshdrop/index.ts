@@ -9,5 +9,6 @@ export {
 };
 
 export type {
+    FileInfo,
     SendInfo
 } from "./models.js";

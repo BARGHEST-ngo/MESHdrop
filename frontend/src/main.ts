@@ -50,11 +50,38 @@ async function stopSend() {
     show("home");
 }
 
+function formatSize(bytes: number): string {
+    const units = ["B", "KB", "MB", "GB", "TB"];
+    let i = 0;
+    while (bytes >= 1024 && i < units.length - 1) {
+        bytes /= 1024;
+        i++;
+    }
+    return `${i === 0 ? bytes : bytes.toFixed(1)} ${units[i]}`;
+}
+
+function showFile(name: string, size: number) {
+    const fileEl = el("send-file");
+    fileEl.replaceChildren(); // textContent only, so odd file names can't inject HTML
+    const nameEl = document.createElement("strong");
+    nameEl.textContent = name;
+    const sizeEl = document.createElement("span");
+    sizeEl.className = "file-size";
+    sizeEl.textContent = ` · ${formatSize(size)}`;
+    fileEl.append(nameEl, sizeEl);
+}
+
 sendBtn.addEventListener("click", async () => {
     clearError();
     sendBtn.disabled = true;
-    sendBtn.textContent = "Starting…"; // Start can take a few seconds
     try {
+        const file = await SendService.ChooseFile();
+        if (!file.name) {
+            return; // picker cancelled: stay on home
+        }
+        showFile(file.name, file.size);
+
+        sendBtn.textContent = "Starting…"; // Start can take a few seconds
         const info = await SendService.StartSend();
         sendAddress = info.address;
         el("address").textContent = info.address;
@@ -62,6 +89,8 @@ sendBtn.addEventListener("click", async () => {
         show("send-waiting");
     } catch (err) {
         showError(err);
+        // A file may already be chosen; clear it so the next Send starts fresh.
+        await SendService.StopSend().catch(() => {});
     } finally {
         sendBtn.disabled = false;
         sendBtn.textContent = "Send";
