@@ -59,14 +59,15 @@ jobs:
         with:
           go-version-file: go.mod
 
-      - name: Install Wails CLI
-        run: go install "github.com/wailsapp/wails/v3/cmd/wails3@$WAILS_VERSION"
-
+      # Before the Wails CLI: on Linux, wails3 itself links against GTK/WebKit.
       - name: Install Linux dependencies
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends libgtk-4-dev libwebkitgtk-6.0-dev
+
+      - name: Install Wails CLI
+        run: go install "github.com/wailsapp/wails/v3/cmd/wails3@$WAILS_VERSION"
 
       - name: Build (Linux)
         if: runner.os == 'Linux'
