@@ -1,0 +1,120 @@
+name: Release
+
+# Push a tag like v0.1.0 (or v0.1.0-alpha.1 for a pre-release) to build
+# Linux, macOS and Windows and attach them to a GitHub release.
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: read
+
+env:
+  WAILS_VERSION: v3.0.0 # keep in step with go.mod
+
+jobs:
+  # A draft release first, so a failed build never leaves a half-filled
+  # public release behind.
+  draft:
+    name: Create draft release
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Create draft
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PRERELEASE: ${{ contains(github.ref_name, '-') }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" \
+            --draft --verify-tag --generate-notes --prerelease="$PRERELEASE"
+
+  build:
+    name: Build ${{ matrix.name }}
+    needs: draft
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    permissions:
+      contents: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Built on the oldest supported Ubuntu so the binary also runs on
+          # older glibc versions.
+          - name: linux-amd64
+            os: ubuntu-24.04
+          - name: macos-universal
+            os: macos-latest
+          - name: windows-amd64
+            os: windows-latest
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+
+      - name: Install Wails CLI
+        run: go install "github.com/wailsapp/wails/v3/cmd/wails3@$WAILS_VERSION"
+
+      - name: Install Linux dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends libgtk-4-dev libwebkitgtk-6.0-dev
+
+      - name: Build (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          wails3 task linux:build
+          # tar keeps the executable bit; zip doesn't.
+          tar -czf "$ASSET.tar.gz" -C bin meshdrop
+          echo "FILE=$ASSET.tar.gz" >> "$GITHUB_ENV"
+        env:
+          ASSET: meshdrop-${{ github.ref_name }}-${{ matrix.name }}
+
+      - name: Build (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          wails3 task darwin:package:universal
+          # Ad-hoc sign: Apple Silicon won't run an unsigned binary at all.
+          # This is not a Developer ID signature, so Gatekeeper still warns.
+          codesign --force --deep --sign - bin/meshdrop.app
+          ditto -c -k --keepParent bin/meshdrop.app "$ASSET.zip"
+          echo "FILE=$ASSET.zip" >> "$GITHUB_ENV"
+        env:
+          ASSET: meshdrop-${{ github.ref_name }}-${{ matrix.name }}
+
+      - name: Build (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          wails3 task windows:build ARCH=amd64
+          7z a "$ASSET.zip" ./bin/meshdrop.exe
+          echo "FILE=$ASSET.zip" >> "$GITHUB_ENV"
+        env:
+          ASSET: meshdrop-${{ github.ref_name }}-${{ matrix.name }}
+
+      - name: Upload to release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          sha256sum "$FILE" > "$FILE.sha256"
+          gh release upload "$GITHUB_REF_NAME" "$FILE" "$FILE.sha256" --clobber
+
+  publish:
+    name: Publish release
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    steps:
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release edit "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --draft=false
