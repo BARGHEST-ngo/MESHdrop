@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -37,9 +38,24 @@ func (s *SendService) StartSend() (SendInfo, error) {
 		return SendInfo{}, fmt.Errorf("server already started")
 	}
 
-	srv := meshnet.NewServer(meshnet.ServerConfig{
+	path := s.path
+	var srv *meshnet.Server
+	srv = meshnet.NewServer(meshnet.ServerConfig{
 		OnClientConnected: func(c meshnet.ClientInfo) {
 			application.Get().Event.Emit("send:connected", c.Name)
+			info, err := os.Stat(path)
+			if err != nil {
+				// log error
+				srv.DisconnectClient(c.ID)
+				return
+			}
+			data, err := json.Marshal(FileInfo{Name: filepath.Base(path), Size: info.Size()})
+			if err != nil {
+				// log err
+				srv.DisconnectClient(c.ID)
+				return
+			}
+			srv.Send(c.ID, meshnet.Message{Topic: "offer", Data: data})
 		},
 		OnClientDisconnected: func(c meshnet.ClientInfo, e error) {
 			reason := ""
@@ -47,6 +63,14 @@ func (s *SendService) StartSend() (SendInfo, error) {
 				reason = e.Error()
 			}
 			application.Get().Event.Emit("send:disconnected", reason)
+		},
+		OnMessage: func(clientID string, m meshnet.Message) {
+			switch m.Topic {
+			case "accept":
+				application.Get().Event.Emit("send:accepted")
+			case "decline":
+				application.Get().Event.Emit("send:declined")
+			}
 		},
 	})
 

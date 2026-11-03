@@ -19,7 +19,11 @@ var assets embed.FS
 func init() {
 	application.RegisterEvent[string]("send:connected")
 	application.RegisterEvent[string]("send:disconnected")
+	application.RegisterEvent[application.Void]("send:accepted")
+	application.RegisterEvent[application.Void]("send:declined")
+
 	application.RegisterEvent[string]("receive:disconnected")
+	application.RegisterEvent[FileInfo]("receive:offer")
 }
 
 // main function serves as the application's entry point. It initializes the application, creates a window,

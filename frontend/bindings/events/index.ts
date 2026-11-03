@@ -14,9 +14,24 @@ import "../github.com/wailsapp/wails/v3/internal/eventcreate.js";
 export const ReceiveDisconnected = "receive:disconnected";
 
 /**
+ * Name of the custom event "receive:offer".
+ */
+export const ReceiveOffer = "receive:offer";
+
+/**
+ * Name of the custom event "send:accepted".
+ */
+export const SendAccepted = "send:accepted";
+
+/**
  * Name of the custom event "send:connected".
  */
 export const SendConnected = "send:connected";
+
+/**
+ * Name of the custom event "send:declined".
+ */
+export const SendDeclined = "send:declined";
 
 /**
  * Name of the custom event "send:disconnected".

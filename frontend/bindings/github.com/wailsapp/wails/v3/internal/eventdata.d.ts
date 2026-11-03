@@ -5,11 +5,18 @@
 // @ts-ignore: Unused imports
 import type { Events } from "@wailsio/runtime";
 
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore: Unused imports
+import type * as main$0 from "../../../../DWoodhouse22/meshdrop/models.js";
+
 declare module "@wailsio/runtime" {
     namespace Events {
         interface CustomEvents {
             "receive:disconnected": string;
+            "receive:offer": main$0.FileInfo;
+            "send:accepted": void;
             "send:connected": string;
+            "send:declined": void;
             "send:disconnected": string;
         }
     }

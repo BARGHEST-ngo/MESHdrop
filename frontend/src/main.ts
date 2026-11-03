@@ -12,6 +12,7 @@ const screens = {
     "receive-form": el("screen-receive-form"),
     "receive-connecting": el("screen-receive-connecting"),
     "receive-connected": el("screen-receive-connected"),
+    "receive-offer": el("screen-receive-offer"),
 };
 type Screen = keyof typeof screens;
 
@@ -21,34 +22,27 @@ function show(screen: Screen) {
     }
 }
 
-// ---- Errors ----
+// ---- Status line (errors in red, notices in grey) ----
 
 const errorEl = el("error");
 
 function showError(err: unknown) {
+    errorEl.classList.remove("is-info");
     errorEl.textContent = err instanceof Error ? err.message : String(err);
     console.error(err);
 }
 
+function showNotice(msg: string) {
+    errorEl.classList.add("is-info");
+    errorEl.textContent = msg;
+}
+
 function clearError() {
+    errorEl.classList.remove("is-info");
     errorEl.textContent = "";
 }
 
-// ---- Send ----
-
-const sendBtn = el<HTMLButtonElement>("send");
-const copyBtn = el<HTMLButtonElement>("copy");
-let sendAddress = "";
-
-async function stopSend() {
-    try {
-        await SendService.StopSend();
-    } catch (err) {
-        showError(err);
-    }
-    sendAddress = "";
-    show("home");
-}
+// ---- Files ----
 
 function formatSize(bytes: number): string {
     const units = ["B", "KB", "MB", "GB", "TB"];
@@ -60,15 +54,39 @@ function formatSize(bytes: number): string {
     return `${i === 0 ? bytes : bytes.toFixed(1)} ${units[i]}`;
 }
 
-function showFile(name: string, size: number) {
-    const fileEl = el("send-file");
-    fileEl.replaceChildren(); // textContent only, so odd file names can't inject HTML
+// Renders "name · size" into target. textContent only, so odd file names
+// (including ones chosen by a remote sender) can't inject HTML.
+function renderFile(target: HTMLElement, name: string, size: number) {
+    target.replaceChildren();
     const nameEl = document.createElement("strong");
     nameEl.textContent = name;
     const sizeEl = document.createElement("span");
     sizeEl.className = "file-size";
     sizeEl.textContent = ` · ${formatSize(size)}`;
-    fileEl.append(nameEl, sizeEl);
+    target.append(nameEl, sizeEl);
+}
+
+// ---- Send ----
+
+const sendBtn = el<HTMLButtonElement>("send");
+const copyBtn = el<HTMLButtonElement>("copy");
+const sendStatus = el("send-status");
+let sendAddress = "";
+let peerName = "";
+
+// True while a send session is ours to show. Cleared before stopping, so the
+// disconnect event that our own Stop causes is ignored.
+let sendActive = false;
+
+async function stopSend() {
+    sendActive = false;
+    try {
+        await SendService.StopSend();
+    } catch (err) {
+        showError(err);
+    }
+    sendAddress = "";
+    show("home");
 }
 
 sendBtn.addEventListener("click", async () => {
@@ -79,13 +97,14 @@ sendBtn.addEventListener("click", async () => {
         if (!file.name) {
             return; // picker cancelled: stay on home
         }
-        showFile(file.name, file.size);
+        renderFile(el("send-file"), file.name, file.size);
 
         sendBtn.textContent = "Starting…"; // Start can take a few seconds
         const info = await SendService.StartSend();
         sendAddress = info.address;
         el("address").textContent = info.address;
         el("pin").textContent = info.pin;
+        sendActive = true;
         show("send-waiting");
     } catch (err) {
         showError(err);
@@ -111,17 +130,32 @@ el("send-cancel").addEventListener("click", stopSend);
 el("send-disconnect").addEventListener("click", stopSend);
 
 Events.On("send:connected", (ev) => {
+    if (!sendActive) return;
     clearError();
-    el("peer-name").textContent = ev.data || "unnamed device";
+    peerName = ev.data || "unnamed device";
+    el("peer-name").textContent = peerName;
+    sendStatus.textContent = "Waiting for them to accept…";
     show("send-connected");
+});
+
+Events.On("send:accepted", () => {
+    if (!sendActive) return;
+    sendStatus.textContent = "Accepted"; // the transfer itself comes next
+});
+
+Events.On("send:declined", async () => {
+    if (!sendActive) return;
+    await stopSend();
+    showNotice(`${peerName} declined the file.`);
 });
 
 // A finished session can't be reused, so stop the server and go home.
 Events.On("send:disconnected", async (ev) => {
-    if (ev.data) {
-        errorEl.textContent = `Disconnected: ${ev.data}`;
-    }
+    if (!sendActive) return;
     await stopSend();
+    if (ev.data) {
+        showError(`Disconnected: ${ev.data}`);
+    }
 });
 
 // ---- Receive ----
@@ -130,10 +164,20 @@ const receiveForm = el<HTMLFormElement>("screen-receive-form");
 const receiveAddress = el<HTMLTextAreaElement>("receive-address");
 const receivePin = el<HTMLInputElement>("receive-pin");
 const receiveConnect = el<HTMLButtonElement>("receive-connect");
+const receiveStatus = el("receive-status");
+const acceptBtn = el<HTMLButtonElement>("offer-accept");
+const declineBtn = el<HTMLButtonElement>("offer-decline");
 
 // Bumped on every Connect and Cancel, so a Connect that finishes after the
 // user cancelled (or started again) is ignored instead of changing the screen.
 let attempt = 0;
+
+// Same idea as sendActive: ignore the disconnect our own Cancel causes.
+let receiveActive = false;
+
+// The offer can arrive before Connect() has returned, so remember it and
+// don't let the Connect success overwrite the offer screen.
+let offerShown = false;
 
 function updateConnectEnabled() {
     receiveConnect.disabled = receiveAddress.value.trim() === "" || receivePin.value.length !== 6;
@@ -141,6 +185,7 @@ function updateConnectEnabled() {
 
 async function stopReceive() {
     attempt++;
+    receiveActive = false;
     try {
         await ReceiveService.CancelReceive();
     } catch (err) {
@@ -171,14 +216,18 @@ receiveForm.addEventListener("submit", async (e) => {
     }
     clearError();
     const mine = ++attempt;
+    receiveActive = true;
+    offerShown = false;
     show("receive-connecting");
     try {
         await ReceiveService.Connect(receiveAddress.value.trim(), receivePin.value);
-        if (mine === attempt) {
+        if (mine === attempt && !offerShown) {
+            receiveStatus.textContent = "Waiting for the sender…";
             show("receive-connected");
         }
     } catch (err) {
         if (mine === attempt) {
+            receiveActive = false;
             showError(err);
             show("receive-form");
         }
@@ -192,11 +241,57 @@ el("receive-back").addEventListener("click", () => {
 el("receive-cancel").addEventListener("click", stopReceive);
 el("receive-disconnect").addEventListener("click", stopReceive);
 
-Events.On("receive:disconnected", async (ev) => {
-    if (ev.data) {
-        errorEl.textContent = `Disconnected: ${ev.data}`;
+Events.On("receive:offer", (ev) => {
+    if (!receiveActive) return;
+    offerShown = true;
+    renderFile(el("offer-file"), ev.data.name, ev.data.size);
+    acceptBtn.disabled = false;
+    declineBtn.disabled = false;
+    show("receive-offer");
+});
+
+acceptBtn.addEventListener("click", async () => {
+    acceptBtn.disabled = declineBtn.disabled = true;
+    try {
+        await ReceiveService.Accept();
+        receiveStatus.textContent = "Accepted. Waiting for the file…";
+        show("receive-connected");
+    } catch (err) {
+        showError(err);
+        acceptBtn.disabled = declineBtn.disabled = false;
     }
+});
+
+// STOPGAP: MESHnet v0.1.0-alpha doesn't tell the other side about a deliberate
+// close, and Disconnect drops queued messages. So we can't wait for the sender
+// to hang up (we'd only notice at the liveness timeout), and we can't disconnect
+// straight after Send (the decline would be lost). Give the message a moment to
+// go out, then hang up ourselves. Remove once MESHnet closes gracefully.
+const DECLINE_FLUSH_MS = 500;
+
+declineBtn.addEventListener("click", async () => {
+    acceptBtn.disabled = declineBtn.disabled = true;
+    try {
+        await ReceiveService.Decline();
+    } catch (err) {
+        showError(err);
+        acceptBtn.disabled = declineBtn.disabled = false;
+        return;
+    }
+    receiveActive = false; // our own hang-up below isn't an error
+    receiveStatus.textContent = "Declined. Closing…";
+    show("receive-connected");
+    await new Promise((r) => setTimeout(r, DECLINE_FLUSH_MS));
     await stopReceive();
+    showNotice("You declined the file.");
+});
+
+Events.On("receive:disconnected", async (ev) => {
+    if (!receiveActive) return;
+    await stopReceive();
+    if (ev.data) {
+        showError(`Disconnected: ${ev.data}`);
+    }
 });
 
 show("home");

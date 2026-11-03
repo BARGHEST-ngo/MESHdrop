@@ -25,6 +25,7 @@
         .btn-quiet { background: rgba(255, 255, 255, 0.08); box-shadow: none; }
         .btn:disabled { opacity: 0.5; cursor: default; }
         .error { color: #ff6b6b; min-height: 1.2em; }
+        .error.is-info { color: var(--muted); }
         .file { font-size: 18px; }
         .file-size { opacity: 0.6; }
     </style>
@@ -60,6 +61,7 @@
     <!-- Send: receiver paired -->
     <section class="screen" id="screen-send-connected" hidden>
         <p class="subtitle">Connected to <strong id="peer-name"></strong></p>
+        <span class="field-label" id="send-status"></span>
         <button class="btn btn-quiet" id="send-disconnect">Disconnect</button>
     </section>
 
@@ -84,7 +86,18 @@
     <!-- Receive: paired with sender -->
     <section class="screen" id="screen-receive-connected" hidden>
         <p class="subtitle">Connected to the sender</p>
+        <span class="field-label" id="receive-status"></span>
         <button class="btn btn-quiet" id="receive-disconnect">Disconnect</button>
+    </section>
+
+    <!-- Receive: sender has offered a file -->
+    <section class="screen" id="screen-receive-offer" hidden>
+        <span class="field-label">The sender wants to send you</span>
+        <div class="file" id="offer-file"></div>
+        <div class="row">
+            <button class="btn" id="offer-accept">Accept</button>
+            <button class="btn btn-quiet" id="offer-decline">Decline</button>
+        </div>
     </section>
 
     <p class="error" id="error" role="status" aria-live="polite"></p>

@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"sync"
@@ -47,6 +48,16 @@ func (s *ReceiveService) Connect(address, pin string) error {
 				application.Get().Event.Emit("receive:disconnected", reason)
 			}
 		},
+		OnMessage: func(m meshnet.Message) {
+			if m.Topic == "offer" {
+				var fileInfo FileInfo
+				if err := json.Unmarshal(m.Data, &fileInfo); err != nil {
+					// log error
+					return
+				}
+				application.Get().Event.Emit("receive:offer", fileInfo)
+			}
+		},
 	})
 	s.client = c
 
@@ -87,6 +98,28 @@ func (s *ReceiveService) CancelReceive() error {
 	}
 
 	return err
+}
+
+func (s *ReceiveService) Accept() error {
+	s.mu.Lock()
+	c := s.client
+	s.mu.Unlock()
+	if c == nil {
+		return fmt.Errorf("not connected")
+	}
+
+	return c.Send(meshnet.Message{Topic: "accept"})
+}
+
+func (s *ReceiveService) Decline() error {
+	s.mu.Lock()
+	c := s.client
+	s.mu.Unlock()
+	if c == nil {
+		return fmt.Errorf("not connected")
+	}
+
+	return c.Send(meshnet.Message{Topic: "decline"})
 }
 
 func (s *ReceiveService) ServiceShutdown() error {
