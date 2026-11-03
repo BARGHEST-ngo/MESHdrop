@@ -14,6 +14,23 @@ import (
 	"github.com/wailsapp/wails/v3/pkg/application"
 )
 
+type progressWriter struct {
+	w      io.Writer
+	n      int64
+	last   time.Time
+	report func(n int64)
+}
+
+func (p *progressWriter) Write(b []byte) (int, error) {
+	n, err := p.w.Write(b)
+	p.n += int64(n)
+	if time.Since(p.last) >= 100*time.Millisecond {
+		p.last = time.Now()
+		p.report(p.n)
+	}
+	return n, err
+}
+
 type SendInfo struct {
 	Address string `json:"address"`
 	PIN     string `json:"pin"`
@@ -127,9 +144,15 @@ func sendFile(srv *meshnet.Server, clientID, path string, size int64) {
 	}
 	defer f.Close()
 
-	if _, err := io.CopyN(stream, f, size); err != nil {
-		fail(fmt.Errorf("send: %w", err))
+	pw := &progressWriter{
+		w:      stream,
+		report: func(n int64) { emit("send:progress", n) },
 	}
+	if _, err := io.CopyN(pw, f, size); err != nil {
+		fail(fmt.Errorf("send: %w", err))
+		return
+	}
+	emit("send:progress", size)
 }
 
 func emit(evt string, payload any) {

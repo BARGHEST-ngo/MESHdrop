@@ -29,6 +29,11 @@ export const ReceiveFailed = "receive:failed";
 export const ReceiveOffer = "receive:offer";
 
 /**
+ * Name of the custom event "receive:progress".
+ */
+export const ReceiveProgress = "receive:progress";
+
+/**
  * Name of the custom event "send:accepted".
  */
 export const SendAccepted = "send:accepted";
@@ -57,4 +62,9 @@ export const SendDisconnected = "send:disconnected";
  * Name of the custom event "send:failed".
  */
 export const SendFailed = "send:failed";
+
+/**
+ * Name of the custom event "send:progress".
+ */
+export const SendProgress = "send:progress";
 

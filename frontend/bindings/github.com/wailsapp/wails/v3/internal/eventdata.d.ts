@@ -16,12 +16,14 @@ declare module "@wailsio/runtime" {
             "receive:disconnected": string;
             "receive:failed": string;
             "receive:offer": main$0.FileInfo;
+            "receive:progress": number;
             "send:accepted": void;
             "send:complete": void;
             "send:connected": string;
             "send:declined": void;
             "send:disconnected": string;
             "send:failed": string;
+            "send:progress": number;
         }
     }
 }

@@ -132,7 +132,8 @@ func receiveFile(r io.Reader, dest string, size int64) (err error) {
 		}
 	}()
 
-	_, err = io.CopyN(f, r, size) // don't wait for EOF (see the close gap)
+	pw := &progressWriter{w: f, report: func(n int64) { emit("receive:progress", n) }}
+	_, err = io.CopyN(pw, r, size)
 	if err == nil {
 		err = f.Sync()
 	}
@@ -175,33 +176,40 @@ func (s *ReceiveService) CancelReceive() error {
 	return err
 }
 
-func (s *ReceiveService) Accept() (bool, error) {
+func (s *ReceiveService) Accept() (string, error) {
 	s.mu.Lock()
-	c := s.client
-	sess := s.sess
+	c, sess := s.client, s.sess
 	s.mu.Unlock()
 	if c == nil || sess == nil {
-		return false, fmt.Errorf("not connected")
+		return "", fmt.Errorf("not connected")
 	}
 
 	sess.mu.Lock()
 	offer := sess.offer
 	sess.mu.Unlock()
 	if offer == nil {
-		return false, fmt.Errorf("no offer")
+		return "", fmt.Errorf("no offer")
 	}
 
 	dst, err := application.Get().Dialog.SaveFile().
 		SetFilename(safeName(offer.Name)).
 		PromptForSingleSelection()
 	if err != nil || dst == "" {
-		return false, err
+		return "", err
 	}
 
 	sess.mu.Lock()
+	if sess.offer != offer {
+		sess.mu.Unlock()
+		return "", fmt.Errorf("offer changed")
+	}
 	sess.dst = dst
 	sess.mu.Unlock()
-	return true, c.Send(meshnet.Message{Topic: "accept"})
+
+	if err := c.Send(meshnet.Message{Topic: "accept"}); err != nil {
+		return "", err
+	}
+	return dst, nil
 }
 
 func (s *ReceiveService) Decline() error {

@@ -2,107 +2,313 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8"/>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
-    <link rel="stylesheet" href="/style.css"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
     <title>MESHdrop</title>
-    <style>
-        /* Placeholder layout for the first working version; the real design comes later. */
-        .screen[hidden] { display: none; }
-        .screen { display: flex; flex-direction: column; gap: 14px; align-items: flex-start; width: 100%; max-width: 560px; }
-        .field-label { font-size: 13px; opacity: 0.7; }
-        .address {
-            width: 100%; font-family: monospace; font-size: 12px;
-            word-break: break-all; padding: 10px; border-radius: 10px;
-            background: rgba(255, 255, 255, 0.06);
-        }
-        textarea.address { color: inherit; border: 1px solid rgba(255, 255, 255, 0.12); resize: none; height: 5.5em; }
-        .pin { font-size: 44px; letter-spacing: 0.25em; font-variant-numeric: tabular-nums; }
-        input.pin {
-            width: 7.5em; font-size: 28px; padding: 6px 10px; border-radius: 10px; color: inherit;
-            background: rgba(255, 255, 255, 0.06); border: 1px solid rgba(255, 255, 255, 0.12);
-        }
-        .row { display: flex; gap: 10px; }
-        .btn-quiet { background: rgba(255, 255, 255, 0.08); box-shadow: none; }
-        .btn:disabled { opacity: 0.5; cursor: default; }
-        .error { color: #ff6b6b; min-height: 1.2em; }
-        .error.is-info { color: var(--muted); }
-        .file { font-size: 18px; }
-        .file-size { opacity: 0.6; }
-    </style>
 </head>
 <body>
-<div class="bg" aria-hidden="true"></div>
+<!--
+  One shared frame (header + footer) around every screen.
+  Each <section class="screen"> sets the frame's text through:
+    data-context  the word on the right of the header
+    data-footer   the footer line
+    data-dot      present = show the blue dot before the footer line
+  main.ts shows one screen at a time by toggling `hidden`.
+-->
+<div class="app">
+    <header class="bar">
+        <div class="brand">MESH<span>drop</span></div>
+        <div class="context" id="context"></div>
+    </header>
 
-<main class="container">
-    <h1 class="title"><span class="title-accent">MESH</span>drop</h1>
+    <main class="screens">
 
-    <!-- Home: choose a direction -->
-    <section class="screen" id="screen-home">
-        <p class="subtitle">Private file transfer. No cloud, no account, no trace.</p>
-        <div class="row">
-            <button class="btn" id="send">Send</button>
-            <button class="btn" id="receive">Receive</button>
-        </div>
-    </section>
+        <!-- ================= Home ================= -->
+        <section class="screen" id="screen-home"
+                 data-context="No cloud · No account · No trace"
+                 data-footer="Encrypted end to end · Nothing is stored after the session">
+            <div class="lead">
+                <h1>Send a file straight to someone.</h1>
+                <p>Private file transfer. No cloud, no account, no trace.</p>
+                <div class="actions">
+                    <button class="btn is-large" id="send">Send a file</button>
+                    <button class="btn-outline is-large" id="receive">Receive a file</button>
+                </div>
+            </div>
+            <div class="card">
+                <div class="label">How it works</div>
+                <div class="how"><div class="how-n">1</div>
+                    <div class="how-t"><strong>Choose a file.</strong> You get a link and a PIN.</div></div>
+                <div class="rule"></div>
+                <div class="how"><div class="how-n">2</div>
+                    <div class="how-t"><strong>Share them separately.</strong> The link in any chat, the PIN on a call.</div></div>
+                <div class="rule"></div>
+                <div class="how"><div class="how-n">3</div>
+                    <div class="how-t"><strong>They accept.</strong> The file goes directly to them, then the link stops working.</div></div>
+            </div>
+        </section>
 
-    <!-- Send: server running, pairing open -->
-    <section class="screen" id="screen-send-waiting" hidden>
-        <div class="file" id="send-file"></div>
-        <span class="field-label">Send this link to the receiver</span>
-        <div class="address" id="address"></div>
-        <span class="field-label">Then give them this PIN separately</span>
-        <div class="pin" id="pin"></div>
-        <div class="row">
-            <button class="btn" id="copy">Copy link</button>
-            <button class="btn btn-quiet" id="send-cancel">Cancel</button>
-        </div>
-    </section>
+        <!-- ================= Send: link & PIN ================= -->
+        <section class="screen" id="screen-send-waiting" hidden
+                 data-context="Sending" data-dot
+                 data-footer="Waiting for the receiver · The link stops working when you cancel">
+            <div class="lead">
+                <h1>Ready to send.</h1>
+                <div class="file-line" id="send-file"></div>
+                <ol class="steps">
+                    <li>Copy the link and send it in your usual chat.</li>
+                    <li>Read the PIN out on a call, or text it separately.</li>
+                    <li>They accept, and the file goes straight to them.</li>
+                </ol>
+                <div class="actions">
+                    <button class="btn" id="copy">Copy link</button>
+                    <button class="btn-outline" id="send-cancel">Cancel</button>
+                </div>
+            </div>
+            <div class="card">
+                <div class="label">PIN</div>
+                <div class="pin" id="pin"></div>
+                <div class="rule"></div>
+                <div class="label">Link</div>
+                <div class="link" id="address"></div>
+            </div>
+        </section>
 
-    <!-- Send: receiver paired -->
-    <section class="screen" id="screen-send-connected" hidden>
-        <p class="subtitle">Connected to <strong id="peer-name"></strong></p>
-        <span class="field-label" id="send-status"></span>
-        <button class="btn btn-quiet" id="send-disconnect">Disconnect</button>
-    </section>
+        <!-- ================= Send: waiting to accept ================= -->
+        <section class="screen" id="screen-send-connected" hidden
+                 data-context="Sending" data-dot
+                 data-footer="Paired · The PIN has been used and can't pair anyone else">
+            <div class="lead">
+                <h1>Connected.</h1>
+                <p>Waiting for them to accept</p>
+                <div class="actions">
+                    <button class="btn-outline" id="send-disconnect">Disconnect</button>
+                </div>
+            </div>
+            <div class="card">
+                <div class="label">Receiver</div>
+                <div class="peer" id="peer-name"></div>
+                <div class="status"><span class="dot"></span>Deciding whether to accept…</div>
+                <div class="rule"></div>
+                <div class="label">File</div>
+                <div class="file-line" id="connected-file"></div>
+            </div>
+        </section>
 
-    <!-- Receive: enter link and PIN -->
-    <form class="screen" id="screen-receive-form" hidden>
-        <label class="field-label" for="receive-address">Paste the link from the sender</label>
-        <textarea class="address" id="receive-address" spellcheck="false" autocomplete="off"></textarea>
-        <label class="field-label" for="receive-pin">PIN</label>
-        <input class="pin" id="receive-pin" inputmode="numeric" maxlength="6" autocomplete="off"/>
-        <div class="row">
-            <button class="btn" id="receive-connect" type="submit" disabled>Connect</button>
-            <button class="btn btn-quiet" id="receive-back" type="button">Back</button>
-        </div>
-    </form>
+        <!-- ================= Send: sending ================= -->
+        <section class="screen" id="screen-send-sending" hidden
+                 data-context="Sending" data-dot data-footer="Encrypted end to end">
+            <div class="lead">
+                <h1>Sending…</h1>
+                <div class="file-line"><strong id="sending-name"></strong> to <strong id="sending-peer"></strong></div>
+                <p class="small">Keep MESHdrop open until it finishes.</p>
+                <div class="actions">
+                    <button class="btn-outline" id="sending-cancel">Cancel</button>
+                </div>
+            </div>
+            <div class="card progress is-indeterminate" id="send-progress">
+                <div class="label">Progress</div>
+                <div class="pct"></div>
+                <div class="track"><div class="fill"></div></div>
+                <div class="bytes"></div>
+            </div>
+        </section>
 
-    <!-- Receive: Connect in progress -->
-    <section class="screen" id="screen-receive-connecting" hidden>
-        <p class="subtitle">Connecting…</p>
-        <button class="btn btn-quiet" id="receive-cancel">Cancel</button>
-    </section>
+        <!-- ================= Send: sent ================= -->
+        <section class="screen" id="screen-send-sent" hidden
+                 data-context="Done" data-footer="Encrypted end to end · Nothing is stored after the session">
+            <div class="lead">
+                <h1>Sent.</h1>
+                <p><strong id="sent-name"></strong> arrived on <strong id="sent-peer"></strong>.</p>
+                <div class="actions">
+                    <button class="btn" id="sent-again">Send another file</button>
+                    <button class="btn-outline" id="sent-done">Done</button>
+                </div>
+            </div>
+            <div class="card">
+                <div class="label">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                    Complete
+                </div>
+                <dl class="facts">
+                    <dt>File</dt><dd class="is-strong" id="sent-fact-name"></dd>
+                    <dt>Size</dt><dd id="sent-fact-size"></dd>
+                    <dt>To</dt><dd id="sent-fact-peer"></dd>
+                </dl>
+                <div class="rule"></div>
+                <p class="small">Session closed.</p>
+            </div>
+        </section>
 
-    <!-- Receive: paired with sender -->
-    <section class="screen" id="screen-receive-connected" hidden>
-        <p class="subtitle">Connected to the sender</p>
-        <span class="field-label" id="receive-status"></span>
-        <button class="btn btn-quiet" id="receive-disconnect">Disconnect</button>
-    </section>
+        <!-- ================= Send: declined ================= -->
+        <section class="screen" id="screen-send-declined" hidden
+                 data-context="Done" data-footer="Nothing is stored after the session">
+            <div class="lead">
+                <h1>Declined.</h1>
+                <p><strong id="declined-peer"></strong> said no to <strong id="declined-name"></strong>. Nothing was sent.</p>
+                <div class="actions">
+                    <button class="btn" id="declined-again">Send a different file</button>
+                    <button class="btn-outline" id="declined-done">Done</button>
+                </div>
+            </div>
+            <div class="card">
+                <div class="label">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--ink)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="6" y1="6" x2="18" y2="18"></line><line x1="18" y1="6" x2="6" y2="18"></line></svg>
+                    Declined
+                </div>
+                <p class="small">The session has ended, so the link and PIN no longer work. To try again, start a new send. You'll get a new link and PIN.</p>
+            </div>
+        </section>
 
-    <!-- Receive: sender has offered a file -->
-    <section class="screen" id="screen-receive-offer" hidden>
-        <span class="field-label">The sender wants to send you</span>
-        <div class="file" id="offer-file"></div>
-        <div class="row">
-            <button class="btn" id="offer-accept">Accept</button>
-            <button class="btn btn-quiet" id="offer-decline">Decline</button>
-        </div>
-    </section>
+        <!-- ================= Receive: link & PIN ================= -->
+        <section class="screen" id="screen-receive-form" hidden
+                 data-context="Receiving" data-footer="Three wrong PINs and the sender has to start again">
+            <div class="lead">
+                <h1>Receive a file.</h1>
+                <ol class="steps">
+                    <li>Paste the link the sender gave you.</li>
+                    <li>Type the PIN they told you separately.</li>
+                    <li>Check the file, then accept or decline.</li>
+                </ol>
+                <p class="quiet">Only accept files from people you know. Nothing arrives until you say yes.</p>
+            </div>
+            <form class="card" id="receive-form">
+                <label class="label" for="receive-address">Link</label>
+                <textarea class="input" id="receive-address" rows="3" spellcheck="false" autocomplete="off"></textarea>
+                <label class="label" for="receive-pin">PIN</label>
+                <input class="input pin-input" id="receive-pin" inputmode="numeric" maxlength="6" autocomplete="off"/>
+                <div class="actions">
+                    <button class="btn" id="receive-connect" type="submit" disabled>Connect</button>
+                    <button class="btn-outline" id="receive-back" type="button">Back</button>
+                </div>
+            </form>
+        </section>
 
-    <p class="error" id="error" role="status" aria-live="polite"></p>
-</main>
+        <!-- ================= Receive: connecting ================= -->
+        <section class="screen" id="screen-receive-connecting" hidden
+                 data-context="Receiving" data-footer="Gives up after 30 seconds">
+            <div class="lead">
+                <h1>Connecting…</h1>
+                <div class="actions">
+                    <button class="btn-outline" id="receive-cancel">Cancel</button>
+                </div>
+            </div>
+        </section>
 
-<script type="module" src="/src/main.js"></script>
+        <!-- ================= Receive: paired, waiting for the offer =================
+             Not in the design: the offer normally arrives straight after pairing,
+             so this is only seen for a moment, if at all. -->
+        <section class="screen" id="screen-receive-connected" hidden
+                 data-context="Receiving" data-dot data-footer="Connected to the sender · Encrypted end to end">
+            <div class="lead">
+                <h1>Connected.</h1>
+                <p id="receive-status">Waiting for the sender…</p>
+                <div class="actions">
+                    <button class="btn-outline" id="receive-disconnect">Disconnect</button>
+                </div>
+            </div>
+        </section>
+
+        <!-- ================= Receive: offer ================= -->
+        <section class="screen" id="screen-receive-offer" hidden
+                 data-context="Receiving" data-dot data-footer="Connected to the sender · Encrypted end to end">
+            <div class="lead">
+                <h1>Incoming file.</h1>
+                <p>The sender you paired with wants to send you this file. Accept to choose where to save it.</p>
+                <div class="actions">
+                    <button class="btn" id="offer-accept">Accept and save…</button>
+                    <button class="btn-outline" id="offer-decline">Decline</button>
+                </div>
+            </div>
+            <div class="card">
+                <div class="offer-name" id="offer-name"></div>
+                <div class="offer-size" id="offer-size"></div>
+                <div class="rule"></div>
+                <p class="small">Nothing has been downloaded yet. If you decline, the session will end.</p>
+            </div>
+        </section>
+
+        <!-- ================= Receive: receiving ================= -->
+        <section class="screen" id="screen-receive-receiving" hidden
+                 data-context="Receiving" data-dot data-footer="Encrypted end to end">
+            <div class="lead">
+                <h1>Receiving…</h1>
+                <div class="file-line" id="receiving-file"></div>
+                <div id="receiving-dest-block" hidden>
+                    <div class="label">Saving to</div>
+                    <div class="link" id="receiving-dest"></div>
+                </div>
+                <div class="actions">
+                    <button class="btn-outline" id="receiving-cancel">Cancel</button>
+                </div>
+            </div>
+            <div class="card progress is-indeterminate" id="receive-progress">
+                <div class="label">Progress</div>
+                <div class="pct"></div>
+                <div class="track"><div class="fill"></div></div>
+                <div class="bytes"></div>
+            </div>
+        </section>
+
+        <!-- ================= Receive: saved ================= -->
+        <section class="screen" id="screen-receive-saved" hidden
+                 data-context="Done" data-footer="Encrypted end to end · Nothing is stored after the session">
+            <div class="lead">
+                <h1>Saved.</h1>
+                <p id="saved-line"></p>
+                <div class="actions">
+                    <button class="btn" id="saved-done">Done</button>
+                </div>
+            </div>
+            <div class="card">
+                <div class="label">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                    Complete
+                </div>
+                <dl class="facts">
+                    <dt>File</dt><dd class="is-strong" id="saved-fact-name"></dd>
+                    <dt>Size</dt><dd id="saved-fact-size"></dd>
+                    <dt id="saved-fact-dest-label" hidden>Saved to</dt><dd class="mono" id="saved-fact-dest" hidden></dd>
+                </dl>
+                <div class="rule"></div>
+                <p class="small">Session closed.</p>
+            </div>
+        </section>
+
+        <!-- ================= Failed (both sides) ================= -->
+        <section class="screen" id="screen-failed" hidden
+                 data-context="" data-footer="Nothing is stored after the session">
+            <div class="lead">
+                <h1 class="is-danger">Transfer failed.</h1>
+                <p id="failed-line"></p>
+                <p class="small" id="failed-hint"></p>
+                <div class="actions">
+                    <button class="btn" id="failed-retry"></button>
+                    <button class="btn-outline" id="failed-done">Done</button>
+                </div>
+            </div>
+            <div class="card is-danger">
+                <dl class="facts">
+                    <dt>File</dt><dd class="is-strong" id="failed-fact-name"></dd>
+                    <dt id="failed-fact-progress-label" hidden>Received</dt><dd id="failed-fact-progress" hidden></dd>
+                    <dt id="failed-fact-disk-label" hidden>Left on disk</dt><dd id="failed-fact-disk" hidden>Nothing</dd>
+                </dl>
+                <div class="rule"></div>
+                <div class="label">Details</div>
+                <div class="detail" id="failed-detail"></div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- Errors (red) and notices (grey) for the current screen. -->
+    <p class="message" id="message" role="status" aria-live="polite"></p>
+
+    <footer class="foot">
+        <span class="dot" id="foot-dot" hidden></span>
+        <span id="foot-text"></span>
+    </footer>
+</div>
+
+<script type="module" src="/src/main.ts"></script>
 </body>
 </html>

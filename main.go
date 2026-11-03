@@ -23,11 +23,13 @@ func init() {
 	application.RegisterEvent[application.Void]("send:declined")
 	application.RegisterEvent[application.Void]("send:complete")
 	application.RegisterEvent[string]("send:failed")
+	application.RegisterEvent[int64]("send:progress")
 
 	application.RegisterEvent[string]("receive:disconnected")
 	application.RegisterEvent[FileInfo]("receive:offer")
 	application.RegisterEvent[application.Void]("receive:complete")
 	application.RegisterEvent[string]("receive:failed")
+	application.RegisterEvent[int64]("receive:progress")
 }
 
 // main function serves as the application's entry point. It initializes the application, creates a window,
@@ -41,8 +43,7 @@ func main() {
 	// 'Bind' is a list of Go struct instances. The frontend has access to the methods of these instances.
 	// 'Mac' options tailor the application when running an macOS.
 	app := application.New(application.Options{
-		Name:        "meshdrop",
-		Description: "A demo of using raw HTML & CSS",
+		Name: "meshdrop",
 		Services: []application.Service{
 			application.NewService(&SendService{}),
 			application.NewService(&ReceiveService{}),
@@ -70,7 +71,7 @@ func main() {
 			Backdrop:                application.MacBackdropTranslucent,
 			TitleBar:                application.MacTitleBarHiddenInset,
 		},
-		BackgroundColour: application.NewRGB(6, 7, 15),
+		BackgroundColour: application.NewRGB(244, 242, 236),
 		URL:              "/",
 	})
 

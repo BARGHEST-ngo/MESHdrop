@@ -1,0 +1,295 @@
+/* MESHdrop: direction B ("Paper").
+   Every colour, size and spacing value lives in :root, so a retheme is a
+   change here only. */
+
+:root {
+    --bg: #F4F2EC;          /* page */
+    --card: #FFFFFF;
+    --card-border: #DCD8CE;
+    --rule: #E6E2D8;        /* dividers inside cards */
+    --field: #FAF9F5;       /* input background */
+    --field-border: #C9C4B8;
+
+    --ink: #16181D;         /* headings, strong text, header rule */
+    --text: #3A3F48;        /* body text */
+    --muted: #5E6470;       /* labels, footer */
+
+    --accent: #2F5BEA;
+    --accent-hover: #1E3FB0;
+    --danger: #B42318;
+
+    --sans: "IBM Plex Sans", system-ui, sans-serif;
+    --mono: "IBM Plex Mono", ui-monospace, monospace;
+
+    color-scheme: light;    /* the design is light-only */
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+    margin: 0;
+    height: 100%;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: var(--sans);
+    -webkit-font-smoothing: antialiased;
+}
+
+/* ---- Frame: header, screen area, footer ---- */
+
+.app {
+    min-height: 100%;
+    display: flex;
+    flex-direction: column;
+    padding: 32px 48px;
+}
+
+.bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    border-bottom: 2px solid var(--ink);
+    padding-bottom: 12px;
+}
+
+.brand { font-size: 22px; font-weight: 700; letter-spacing: -0.02em; }
+.brand span { font-weight: 400; }
+.context { font-size: 13px; color: var(--muted); }
+
+.screens { flex-grow: 1; }
+
+/* Each screen: two columns, pinned to the top so headings never move. */
+.screen {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 56px;
+    align-items: start;
+    padding-top: 64px;
+}
+.screen[hidden] { display: none; }
+
+.foot {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+    color: var(--muted);
+    min-height: 1.5em;
+}
+.dot { width: 8px; height: 8px; border-radius: 4px; background: var(--accent); flex: none; }
+.dot[hidden] { display: none; }
+
+/* ---- Left column ---- */
+
+.lead { display: flex; flex-direction: column; gap: 22px; }
+
+h1 {
+    margin: 0;
+    font-size: 44px;
+    line-height: 1.05;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+}
+h1.is-danger { color: var(--danger); }
+
+p { margin: 0; font-size: 16px; line-height: 1.5; color: var(--text); }
+p.small { font-size: 15px; }
+p.quiet { font-size: 14px; color: var(--muted); }
+strong { color: var(--ink); }
+
+ol.steps {
+    margin: 0;
+    padding-left: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    font-size: 15px;
+    line-height: 1.4;
+    color: var(--text);
+}
+
+.file-line { font-size: 16px; color: var(--text); overflow-wrap: anywhere; }
+
+/* ---- Buttons ---- */
+
+.actions { display: flex; gap: 10px; flex-wrap: wrap; }
+
+.btn {
+    font-family: var(--sans);
+    font-size: 15px;
+    font-weight: 600;
+    min-height: 44px;
+    padding: 0 20px;
+    border-radius: 6px;
+    border: none;
+    background: var(--accent);
+    color: #FFFFFF;
+    cursor: pointer;
+}
+.btn:hover { background: var(--accent-hover); }
+.btn.is-large { font-size: 16px; min-height: 48px; padding: 0 24px; }
+
+.btn-outline {
+    font-family: var(--sans);
+    font-size: 15px;
+    font-weight: 400;
+    min-height: 44px;
+    padding: 0 20px;
+    border-radius: 6px;
+    border: 1.5px solid var(--ink);
+    background: transparent;
+    color: var(--ink);
+    cursor: pointer;
+}
+.btn-outline:hover { background: rgba(22, 24, 29, 0.05); }
+.btn-outline.is-large { font-size: 16px; font-weight: 500; min-height: 48px; padding: 0 24px; }
+
+.btn:disabled, .btn-outline:disabled { opacity: 0.5; cursor: default; }
+.btn:disabled:hover { background: var(--accent); }
+
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* ---- Right column: card ---- */
+
+.card {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    background: var(--card);
+    border: 1px solid var(--card-border);
+    border-radius: 8px;
+    padding: 32px;
+    min-width: 0;
+}
+.card.is-danger { border-top: 4px solid var(--danger); }
+
+.label {
+    font-size: 13px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--muted);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.label svg { flex: none; }
+
+.rule { height: 1px; background: var(--rule); }
+
+.status { display: flex; align-items: center; gap: 8px; font-size: 15px; color: var(--text); }
+
+.pin {
+    font-size: 68px;
+    line-height: 1;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+    user-select: text;
+}
+
+.link {
+    font-family: var(--mono);
+    font-size: 13px;
+    line-height: 1.5;
+    color: var(--text);
+    word-break: break-all;
+    user-select: text;
+}
+
+.peer { font-size: 36px; line-height: 1.1; font-weight: 600; letter-spacing: -0.01em; overflow-wrap: anywhere; }
+
+.offer-name { font-size: 24px; font-weight: 600; letter-spacing: -0.01em; overflow-wrap: anywhere; }
+.offer-size { font-size: 16px; color: var(--text); margin-top: -12px; }
+
+/* "How it works" steps on Home */
+.how { display: flex; gap: 16px; }
+.how-n { font-size: 28px; font-weight: 600; line-height: 1; color: var(--accent); width: 24px; flex: none; }
+.how-t { font-size: 15px; line-height: 1.45; color: var(--text); }
+
+/* Two-column facts (File / Size / To …) */
+.facts {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px 20px;
+    font-size: 15px;
+    margin: 0;
+}
+.facts dt { color: var(--muted); }
+.facts dd { margin: 0; overflow-wrap: anywhere; }
+.facts dd.is-strong { font-weight: 600; }
+.facts .mono { font-family: var(--mono); font-size: 13px; }
+.facts [hidden] { display: none; }
+
+.detail {
+    font-family: var(--mono);
+    font-size: 13px;
+    color: var(--text);
+    background: var(--field);
+    border-radius: 6px;
+    padding: 10px 12px;
+    overflow-wrap: anywhere;
+    user-select: text;
+}
+
+/* ---- Progress ---- */
+
+.pct {
+    font-size: 88px;
+    line-height: 1;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    font-variant-numeric: tabular-nums;
+}
+.track { height: 8px; background: var(--rule); border-radius: 4px; overflow: hidden; }
+.fill { height: 100%; width: 0; background: var(--accent); transition: width 0.2s linear; }
+.bytes { font-size: 14px; color: var(--text); font-variant-numeric: tabular-nums; }
+
+/* Until the backend reports progress, the bar slides back and forth instead
+   of showing a made-up number. */
+.progress.is-indeterminate .pct,
+.progress.is-indeterminate .bytes { display: none; }
+.progress.is-indeterminate .fill { width: 30%; animation: slide 1.2s ease-in-out infinite alternate; }
+@keyframes slide { from { margin-left: 0; } to { margin-left: 70%; } }
+
+/* ---- Receive form ---- */
+
+textarea.input, input.input {
+    font-family: var(--mono);
+    font-size: 13px;
+    line-height: 1.5;
+    color: var(--ink);
+    background: var(--field);
+    border: 1.5px solid var(--field-border);
+    border-radius: 6px;
+    padding: 10px 12px;
+    resize: none;
+    width: 100%;
+}
+input.input.pin-input {
+    font-family: var(--sans);
+    font-size: 40px;
+    font-weight: 600;
+    letter-spacing: 0.18em;
+    font-variant-numeric: tabular-nums;
+    padding: 6px 12px;
+    width: 220px;
+}
+.input:focus { border-color: var(--accent); outline: none; }
+
+/* ---- Errors and notices ---- */
+
+.message { min-height: 1.4em; font-size: 14px; margin-top: 16px; }
+.message.is-error { color: var(--danger); }
+.message.is-info { color: var(--muted); }
+
+/* ---- Narrow windows: stack the columns ---- */
+
+@media (max-width: 760px) {
+    .app { padding: 24px 16px; }
+    .screen { grid-template-columns: minmax(0, 1fr); gap: 32px; padding-top: 40px; }
+    h1 { font-size: 36px; }
+    .pct { font-size: 64px; }
+    .pin { font-size: 56px; }
+}
